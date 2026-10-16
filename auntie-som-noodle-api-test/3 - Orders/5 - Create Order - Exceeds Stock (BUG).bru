@@ -1,0 +1,40 @@
+meta {
+  name: Create Order - Exceeds Stock (BUG)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/orders
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+  Content-Type: application/json
+}
+
+script:pre-request {
+  // Always order MORE than whatever stock is currently left for Fried
+  // Rice, so this test keeps proving the bug even on repeated runs.
+  const stock = Number(bru.getEnvVar("friedRiceStock"));
+  bru.setEnvVar("overStockQty", (isNaN(stock) ? 1 : stock) + 10);
+}
+
+body:json {
+  {
+    "itemId": 2,
+    "quantity": {{overStockQty}}
+  }
+}
+
+tests {
+  test("BUG: ordering more than available stock should be rejected", function () {
+    // app.py only checks `if item["stock"] <= 0`. It never compares
+    // stock against the requested quantity, so stock can go negative.
+    // This assertion encodes the CORRECT rule (reject the order), and
+    // therefore fails against the current buggy backend.
+    expect(res.getStatus()).to.be.oneOf([400, 409]);
+  });
+}

@@ -1,0 +1,29 @@
+meta {
+  name: Create Order - Invalid Item
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/orders
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "itemId": 999,
+    "quantity": 1
+  }
+}
+
+tests {
+  test("status should be 404 for an item that does not exist", function () {
+    expect(res.getStatus()).to.equal(404);
+  });
+}

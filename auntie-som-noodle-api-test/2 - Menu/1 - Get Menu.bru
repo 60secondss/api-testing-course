@@ -1,0 +1,53 @@
+meta {
+  name: Get Menu
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/menu
+  auth: none
+}
+
+script:post-response {
+  // Save current stock/price so later order tests react to whatever is
+  // actually left on the server, even if this collection gets re-run
+  // against the same Flask process without a restart.
+  const friedRice = res.body.find((item) => item.id === 2);
+  const tomYum = res.body.find((item) => item.id === 1);
+
+  if (friedRice) {
+    bru.setEnvVar("friedRiceStock", friedRice.stock);
+    bru.setEnvVar("friedRicePrice", friedRice.price);
+  }
+  if (tomYum) {
+    bru.setEnvVar("tomYumStock", tomYum.stock);
+    bru.setEnvVar("tomYumPrice", tomYum.price);
+  }
+}
+
+tests {
+  test("status should be 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("should return a non-empty array of menu items", function () {
+    expect(res.body).to.be.an("array");
+    expect(res.body.length).to.be.above(0);
+  });
+
+  test("every item should have id, name, price and stock", function () {
+    res.body.forEach((item) => {
+      expect(item).to.have.property("id");
+      expect(item).to.have.property("name");
+      expect(item).to.have.property("price");
+      expect(item).to.have.property("stock");
+    });
+  });
+
+  test("stock should never be negative (sanity check before ordering)", function () {
+    res.body.forEach((item) => {
+      expect(item.stock).to.be.at.least(0);
+    });
+  });
+}

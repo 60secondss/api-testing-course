@@ -1,0 +1,18 @@
+meta {
+  name: Get Order - Non-existent (BUG)
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/orders/ORD-doesnotexist
+  auth: none
+}
+
+tests {
+  test("BUG: unknown orderId should return 404, not 200", function () {
+    // get_order() does `jsonify({"error": "Order not found"}), 200` --
+    // the 200 is hardcoded even though the body is an error payload.
+    expect(res.getStatus()).to.equal(404);
+  });
+}

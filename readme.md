@@ -154,3 +154,46 @@ Your task is to create a comprehensive Bruno collection that validates the entir
 
 ---
 *Good luck. Auntie Som is counting on you!* 🍜🔥
+
+---
+
+## 🔎 Audit Findings
+
+I ran the Bruno collection in [`auntie-som-noodle-api-test/`](./auntie-som-noodle-api-test/) against Lek's server and found **4 logic bugs**. All of them return `200 OK`, so they'd sail right past anyone who was just eyeballing status codes.
+
+### Bug 1 — Overselling: stock vs. quantity is never compared
+`POST /orders` only checks `if item["stock"] <= 0`. It never checks whether `quantity` is actually available. Order 11 bowls of Fried Rice when only 1 is in stock, and the API happily accepts it and drives `stock` negative.
+
+- **Where:** `create_order()` in `app.py`, the stock check.
+- **Caught by:** `3 - Orders/5 - Create Order - Exceeds Stock (BUG).bru` — reads the live stock count from `GET /menu`, requests `stock + 10`, and asserts the response should be `400`/`409`. It gets `200` instead, so the test fails and flags the bug.
+
+### Bug 2 — Every order is silently short by 5 baht
+`total_price = (item["price"] * quantity) - 5`. There's a flat `-5` baked into every single order, with no explanation anywhere in the API docs. A Tom Yum Noodles order (price 50, qty 1) returns `totalPrice: 45` instead of `50`.
+
+- **Where:** `create_order()` in `app.py`, the `total_price` line.
+- **Caught by:** `3 - Orders/1 - Create Order - Valid.bru` — asserts `totalPrice` equals `price * quantity` using the price pulled live from `/menu`. Fails with "expected 45 to equal 50".
+
+### Bug 3 — Looking up a missing order returns 200, not 404
+`GET /orders/<order_id>` returns `jsonify({"error": "Order not found"}), 200` when the order doesn't exist — an error payload wrapped in a success status code. Any client checking `response.ok` instead of the body would think the lookup succeeded.
+
+- **Where:** `get_order()` in `app.py`.
+- **Caught by:** `3 - Orders/6 - Get Order - Non-existent (BUG).bru` — requests a made-up `orderId` and asserts `404`. Gets `200` instead.
+
+### Bug 4 — No validation on `quantity` at all
+There's no check that `quantity` is a positive integer. Ordering `0` (or a negative number) is accepted: the stock calculation and `totalPrice` still run, producing nonsense like a `-5` total for an order of nothing.
+
+- **Where:** `create_order()` in `app.py` — no guard before `item["stock"] -= quantity`.
+- **Caught by:** `3 - Orders/7 - Create Order - Zero Quantity (BUG).bru` — orders `quantity: 0` and asserts `400`. Gets `200` instead.
+
+### How the collection is organized
+```
+auntie-som-noodle-api-test/
+├── environments/local.bru        # baseUrl -> http://localhost:5000
+├── 1 - Auth Flow/                 # login, captures accessToken into env
+├── 2 - Menu/                      # reads menu, captures live stock/price into env
+└── 3 - Orders/                    # happy path + the 4 bugs above
+```
+The auth token and current stock/price are captured via `post-response` scripts into environment variables (`accessToken`, `tomYumPrice`, `friedRiceStock`, …) so the later requests never hardcode values that could drift — `Create Order - Exceeds Stock` always asks for "current stock + 10", for example.
+
+### Result when run against Lek's server
+Running the collection end-to-end: **17/21 tests pass, 4 fail** — and the 4 failures are exactly the 4 bugs above, each failing with the specific, readable assertion message quoted next to it. The happy-path, auth, and 404-for-bad-item tests all pass, confirming the collection isn't just failing everything by accident.

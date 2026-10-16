@@ -1,0 +1,42 @@
+meta {
+  name: Login - Valid
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "username": "student",
+    "password": "hungry"
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    bru.setEnvVar("accessToken", res.body.accessToken);
+  }
+}
+
+tests {
+  test("status should be 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("response should contain an accessToken string", function () {
+    expect(res.body.accessToken).to.be.a("string");
+  });
+
+  test("expiresIn should equal 3600", function () {
+    expect(res.body.expiresIn).to.equal(3600);
+  });
+}

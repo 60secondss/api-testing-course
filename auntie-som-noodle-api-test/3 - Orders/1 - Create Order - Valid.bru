@@ -1,0 +1,52 @@
+meta {
+  name: Create Order - Valid
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/orders
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "itemId": 1,
+    "quantity": 1
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    bru.setEnvVar("currentOrderId", res.body.orderId);
+  }
+}
+
+tests {
+  test("status should be 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("response should contain an orderId", function () {
+    expect(res.body.orderId).to.be.a("string");
+  });
+
+  test("status field should be 'created'", function () {
+    expect(res.body.status).to.equal("created");
+  });
+
+  test("BUG: totalPrice should equal price * quantity", function () {
+    // app.py does `(item["price"] * quantity) - 5`, silently knocking 5
+    // off every single order. This assertion encodes the price the API
+    // DOCUMENTS (price * quantity), so it fails against the real server
+    // and proves the pricing bug.
+    const expectedPrice = Number(bru.getEnvVar("tomYumPrice")) * 1;
+    expect(res.body.totalPrice).to.equal(expectedPrice);
+  });
+}

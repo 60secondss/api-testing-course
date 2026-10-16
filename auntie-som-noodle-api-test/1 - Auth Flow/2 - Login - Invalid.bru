@@ -1,0 +1,32 @@
+meta {
+  name: Login - Invalid Credentials
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/auth/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "username": "student",
+    "password": "wrongpassword"
+  }
+}
+
+tests {
+  test("status should be 401 for wrong password", function () {
+    expect(res.getStatus()).to.equal(401);
+  });
+
+  test("response should contain an error message", function () {
+    expect(res.body.error).to.be.a("string");
+  });
+}

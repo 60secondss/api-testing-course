@@ -1,0 +1,32 @@
+meta {
+  name: Create Order - Zero Quantity (BUG)
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/orders
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{accessToken}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "itemId": 1,
+    "quantity": 0
+  }
+}
+
+tests {
+  test("BUG: an order of quantity 0 should be rejected", function () {
+    // There is no validation on `quantity` at all. A quantity of 0 (or
+    // even negative) sails straight through, and totalPrice becomes
+    // (price * 0) - 5 = -5: a negative total for an order of nothing.
+    expect(res.getStatus()).to.equal(400);
+  });
+}
